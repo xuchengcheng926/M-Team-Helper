@@ -1514,8 +1514,8 @@ async def tag_existing_history_torrents():
     try:
         # 按下载器分组获取所有有 info_hash 的历史记录
         records = db.query(DownloadHistory).filter(
-            DownloadHistory.info_hash != None,
-            DownloadHistory.downloader_id != None
+            DownloadHistory.info_hash.isnot(None),
+            DownloadHistory.downloader_id.isnot(None)
         ).all()
 
         if not records:
