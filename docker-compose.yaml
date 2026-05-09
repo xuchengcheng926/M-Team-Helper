@@ -1,0 +1,15 @@
+services:
+  mteam-helper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mteam-helper
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - TZ=Asia/Shanghai
+      - DEBUG=False
+      - MTEAM_BASE_URL=https://api.m-team.cc
