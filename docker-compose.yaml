@@ -1,14 +1,14 @@
 services:
-  mteam-helper:
+  mteam-helper-cc:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: mteam-helper
+    container_name: mteam-helper-cc
     restart: unless-stopped
     ports:
       - "8001:8001"
     volumes:
-      - ./data:/app/data
+      - ./backend/data:/app/data
     environment:
       - TZ=Asia/Shanghai
       - DEBUG=False
