@@ -1,5 +1,7 @@
 # M-Team Helper
 
+本项目fork自https://github.com/spellyaohui/M-Team-Helper
+
 M-Team PT 站自动化助手，提供账号管理、种子浏览与搜索、自动下载规则、下载器联动、下载历史管理、自动删种与系统调度等能力，支持 qBittorrent 和 Transmission。
 
 ## 项目说明
@@ -80,52 +82,13 @@ M-Team PT 站自动化助手，提供账号管理、种子浏览与搜索、自�
 
 ## 快速部署
 
-### 方式一：Docker 部署（推荐）
-
-Docker Hub：<https://hub.docker.com/r/spellyaohui/mteam-helper>
-
-> ⚠️ 飞牛 NAS 等环境如果 8001 端口被占用，请自行改为其他宿主机端口，例如 `8010:8001`。
-
-#### docker-compose
-
-创建 `docker-compose.yml`：
-
-```yaml
-version: '3.8'
-
-services:
-  mteam-helper:
-    image: spellyaohui/mteam-helper:latest
-    container_name: mteam-helper
-    restart: unless-stopped
-    ports:
-      - "8001:8001"
-    volumes:
-      - ./data:/app/data
-    environment:
-      - TZ=Asia/Shanghai
-      - DEBUG=False
-      - MTEAM_BASE_URL=https://api.m-team.cc
-```
+### 方式一：Docker 部署，本地构建镜像
 
 启动：
 
 ```bash
-docker-compose up -d
-```
-
-#### docker run
-
-```bash
-docker run -d \
-  --name mteam-helper \
-  --restart unless-stopped \
-  -p 8001:8001 \
-  -v $(pwd)/data:/app/data \
-  -e TZ=Asia/Shanghai \
-  -e DEBUG=False \
-  -e MTEAM_BASE_URL=https://api.m-team.cc \
-  spellyaohui/mteam-helper:latest
+git clone https://github.com/xuchengcheng926/M-Team-Helper.git
+docker compose up -d
 ```
 
 部署完成后访问：
@@ -134,29 +97,7 @@ docker run -d \
 - API 文档：`http://服务器IP:8001/docs`
 - 健康检查：`http://服务器IP:8001/health`
 
-### 方式二：Linux 一键部署
-
-适用于 Ubuntu、Debian、CentOS、RHEL、Fedora 等主流发行版。
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/spellyaohui/M-Team-Helper/main/deploy.sh -o deploy.sh
-chmod +x deploy.sh
-sudo bash deploy.sh
-```
-
-更新：
-
-```bash
-sudo bash /opt/mteam-helper/deploy.sh update
-```
-
-卸载：
-
-```bash
-sudo bash /opt/mteam-helper/deploy.sh uninstall
-```
-
-### 方式三：本地部署
+### 方式二：本地部署
 
 ```bash
 git clone https://github.com/spellyaohui/M-Team-Helper.git
