@@ -8,6 +8,9 @@ import asyncio
 import qbittorrentapi
 from transmission_rpc import Client as TransmissionClient
 
+# 通过本软件添加的所有种子都会打上此标签，用于与其他软件添加的种子区分
+M_TEAM_HELPER_TAG = "M-Team-Helper"
+
 
 def _get_qb_client(downloader):
     """获取 qBittorrent 客户端"""
@@ -188,19 +191,22 @@ async def add_torrent(
         if downloader.type == "qbittorrent":
             client = _get_qb_client(downloader)
             
-            # 如果有标签，先确保标签存在
-            if tags:
-                existing_tags = set(client.torrents_tags() or [])
-                new_tags = [t for t in tags if t not in existing_tags]
-                if new_tags:
-                    client.torrents_create_tags(tags=new_tags)
-                    print(f"[Downloader] 创建新标签: {new_tags}")
+            # 始终包含 M_TEAM_HELPER_TAG，确保所有通过本软件添加的种子都打上标签
+            all_tags = list(tags or [])
+            if M_TEAM_HELPER_TAG not in all_tags:
+                all_tags.append(M_TEAM_HELPER_TAG)
+            
+            # 确保所有标签都存在
+            existing_tags = set(client.torrents_tags() or [])
+            new_tags = [t for t in all_tags if t not in existing_tags]
+            if new_tags:
+                client.torrents_create_tags(tags=new_tags)
+                print(f"[Downloader] 创建新标签: {new_tags}")
             
             kwargs = {"torrent_files": torrent_content}
             if save_path:
                 kwargs["save_path"] = save_path
-            if tags:
-                kwargs["tags"] = ",".join(tags)
+            kwargs["tags"] = ",".join(all_tags)
             
             # 添加种子
             client.torrents_add(**kwargs)
@@ -768,6 +774,96 @@ async def get_all_torrents_with_details(downloader) -> List[Dict[str, Any]]:
     except Exception as e:
         print(f"[Downloader] 获取种子详细信息失败: {e}")
         return []
+
+
+def _sync_get_qb_mteam_torrents(downloader) -> List[Dict[str, Any]]:
+    """同步获取 qBittorrent 中带有 M-Team-Helper 标签的种子"""
+    client = _get_qb_client(downloader)
+    torrents = client.torrents_info(tag=M_TEAM_HELPER_TAG)
+    result = []
+    for t in torrents:
+        tags = [tag.strip() for tag in t.tags.split(',') if tag.strip()] if t.tags else []
+        result.append({
+            "hash": t.hash,
+            "name": t.name,
+            "size": t.size,
+            "added_on": t.added_on,
+            "ratio": t.ratio,
+            "state": t.state,
+            "progress": t.progress * 100,
+            "downloaded": t.downloaded,
+            "uploaded": t.uploaded,
+            "tags": tags
+        })
+    return result
+
+
+async def get_mteam_tagged_torrents(downloader) -> List[Dict[str, Any]]:
+    """获取下载器中带有 M-Team-Helper 标签的所有种子
+    
+    用于动态删种的体积计算，只统计本软件管理的种子，避免影响其他软件添加的任务。
+    对于不支持标签的 Transmission，回退为全量种子列表。
+    
+    Returns:
+        种子列表
+    """
+    try:
+        if downloader.type == "qbittorrent":
+            return await asyncio.to_thread(_sync_get_qb_mteam_torrents, downloader)
+        elif downloader.type == "transmission":
+            return await asyncio.to_thread(_sync_get_tr_all_torrents, downloader)
+        return []
+    except Exception as e:
+        print(f"[Downloader] 获取M-Team-Helper标签种子失败: {e}")
+        return []
+
+
+def _sync_add_mteam_tag_to_torrents(downloader, info_hashes: List[str]) -> int:
+    """同步为已存在的 qBittorrent 种子添加 M-Team-Helper 标签（向前兼容）
+    
+    Returns:
+        实际打上标签的种子数量
+    """
+    if not info_hashes:
+        return 0
+    client = _get_qb_client(downloader)
+    # 确保标签在下载器中存在
+    existing_tags = set(client.torrents_tags() or [])
+    if M_TEAM_HELPER_TAG not in existing_tags:
+        client.torrents_create_tags(tags=[M_TEAM_HELPER_TAG])
+
+    # 一次性获取所有种子信息，避免逐个查询
+    all_torrents = client.torrents_info()
+    torrent_map = {t.hash.lower(): t for t in all_torrents}
+
+    tagged = 0
+    for info_hash in info_hashes:
+        t = torrent_map.get(info_hash.lower())
+        if t:
+            current_tags = [tag.strip() for tag in t.tags.split(',') if tag.strip()] if t.tags else []
+            if M_TEAM_HELPER_TAG not in current_tags:
+                client.torrents_add_tags(tags=M_TEAM_HELPER_TAG, torrent_hashes=info_hash)
+                tagged += 1
+    return tagged
+
+
+async def add_mteam_tag_to_torrents(downloader, info_hashes: List[str]) -> int:
+    """为已存在的种子添加 M-Team-Helper 标签（向前兼容，仅 qBittorrent 有效）
+    
+    Args:
+        downloader: 下载器配置对象
+        info_hashes: 种子 info_hash 列表
+    
+    Returns:
+        实际打上标签的种子数量
+    """
+    try:
+        if downloader.type == "qbittorrent":
+            return await asyncio.to_thread(_sync_add_mteam_tag_to_torrents, downloader, info_hashes)
+        return 0
+    except Exception as e:
+        print(f"[Downloader] 批量添加M-Team-Helper标签失败: {e}")
+        return 0
 
 
 async def get_downloader_total_size(downloader) -> float:

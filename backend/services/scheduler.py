@@ -10,7 +10,7 @@ import json
 from database import SessionLocal
 from models import Account, FilterRule, DownloadHistory, Downloader, SystemSettings, beijing_now
 from services.scraper import MTeamAPI, parse_torrent
-from services.downloader import add_torrent, get_torrent_info, delete_torrent, get_downloading_count, get_torrent_info_with_tags, get_all_torrents_with_details, get_downloader_total_size, delete_torrents_by_strategy, delete_torrents_by_free_space, get_disk_space_info, check_torrent_unregistered, get_torrent_trackers, normalize_torrent_status
+from services.downloader import add_torrent, get_torrent_info, delete_torrent, get_downloading_count, get_torrent_info_with_tags, get_all_torrents_with_details, get_downloader_total_size, delete_torrents_by_strategy, delete_torrents_by_free_space, get_disk_space_info, check_torrent_unregistered, get_torrent_trackers, normalize_torrent_status, M_TEAM_HELPER_TAG, get_mteam_tagged_torrents, add_mteam_tag_to_torrents
 from routers.rules import match_torrent
 from config import settings, TORRENT_DIR
 from utils.logger import scheduler_logger as logger
@@ -1215,14 +1215,12 @@ async def check_dynamic_delete():
         try:
             logger.info(f" 检查下载器: {downloader.name}")
             
-            # 获取磁盘空间信息
-            disk_info = await get_disk_space_info(downloader)
-            if not disk_info:
-                logger.info(f" 无法获取下载器 {downloader.name} 的磁盘空间信息")
-                return
+            # 仅获取带有 M-Team-Helper 标签的种子，避免将其他软件的种子计入体积
+            # 这同时修复了「动态删种把第三方任务也算入总体积」的问题（issue #2 相关）
+            mteam_torrents = await get_mteam_tagged_torrents(downloader)
             
-            free_space_gb = disk_info.get("free_space_gb", 0)
-            used_space_gb = disk_info.get("used_space_gb", 0)  # 种子占用的空间
+            # 用 M-Team-Helper 标签种子的总大小作为「已用空间」
+            used_space_gb = sum(t["size"] for t in mteam_torrents) / (1024 ** 3)
             
             # 配置含义：
             # max_capacity_gb: 已用空间触发阈值，超过此值时开始删种
@@ -1230,7 +1228,7 @@ async def check_dynamic_delete():
             trigger_threshold_gb = auto_delete_config["max_capacity_gb"]
             target_used_space_gb = auto_delete_config["min_capacity_gb"]
             
-            logger.info(f" 下载器 {downloader.name} 磁盘状态: 种子占用 {used_space_gb:.2f} GB, 剩余 {free_space_gb:.2f} GB")
+            logger.info(f" 下载器 {downloader.name} M-Team-Helper种子占用: {used_space_gb:.2f} GB")
             logger.info(f" 触发阈值: 已用 > {trigger_threshold_gb} GB, 目标已用: {target_used_space_gb} GB")
             
             # 检查是否需要删种：当已用空间 <= 触发阈值时，不需要删种
@@ -1245,18 +1243,16 @@ async def check_dynamic_delete():
             
             logger.info(f" 需要释放空间: {need_to_free_gb:.2f} GB")
             
-            # 获取所有种子详细信息
-            all_torrents = await get_all_torrents_with_details(downloader)
-            if not all_torrents:
-                logger.info(f" 下载器 {downloader.name} 没有种子")
+            if not mteam_torrents:
+                logger.info(f" 下载器 {downloader.name} 没有 M-Team-Helper 种子")
                 return
             
-            # 过滤种子（根据删种范围和标签设置）
+            # 过滤种子（根据删种范围和标签设置），候选池仅限 M-Team-Helper 标签种子
             filtered_torrents = []
             delete_scope = auto_delete_config.get("delete_scope", "all")
             check_tags = auto_delete_config.get("check_tags", True)
             
-            for torrent in all_torrents:
+            for torrent in mteam_torrents:
                 # 查找对应的下载历史记录
                 history_record = db.query(DownloadHistory).filter(
                     DownloadHistory.info_hash == torrent["hash"],
@@ -1366,15 +1362,15 @@ async def check_unregistered_torrents():
             try:
                 logger.info(f"检查下载器: {downloader.name}")
                 
-                # 获取该下载器的所有种子
-                all_torrents = await get_all_torrents_with_details(downloader)
+                # 只检查带有 M-Team-Helper 标签的种子，避免误删其他软件管理的种子
+                mteam_torrents = await get_mteam_tagged_torrents(downloader)
                 
-                if not all_torrents:
+                if not mteam_torrents:
                     continue
                 
-                logger.info(f"下载器 {downloader.name} 共有 {len(all_torrents)} 个种子")
+                logger.info(f"下载器 {downloader.name} 共有 {len(mteam_torrents)} 个 M-Team-Helper 种子")
                 
-                for torrent in all_torrents:
+                for torrent in mteam_torrents:
                     try:
                         # 检查种子是否被站点删除
                         is_unregistered = await check_torrent_unregistered(downloader, torrent["hash"])
@@ -1503,6 +1499,54 @@ async def sync_download_status():
         
     except Exception as e:
         logger.info(f" 状态同步任务失败: {e}")
+    finally:
+        db.close()
+
+
+async def tag_existing_history_torrents():
+    """向前兼容：为已在下载器中但未打上 M-Team-Helper 标签的种子补充标签
+    
+    适用场景：用户从旧版本升级到新版本后，下载历史中已有的种子不会自动
+    携带 M-Team-Helper 标签。本函数在服务启动时运行一次，确保所有通过
+    本软件下载的种子（记录在 download_history 表中）都打上该标签。
+    """
+    db = SessionLocal()
+    try:
+        # 按下载器分组获取所有有 info_hash 的历史记录
+        records = db.query(DownloadHistory).filter(
+            DownloadHistory.info_hash != None,
+            DownloadHistory.downloader_id != None
+        ).all()
+
+        if not records:
+            return
+
+        # 按下载器分组
+        by_downloader: Dict[int, List[str]] = {}
+        for record in records:
+            by_downloader.setdefault(record.downloader_id, []).append(record.info_hash)
+
+        total_tagged = 0
+        for downloader_id, hashes in by_downloader.items():
+            downloader = db.query(Downloader).filter(
+                Downloader.id == downloader_id,
+                Downloader.is_active == True
+            ).first()
+            if not downloader:
+                continue
+            try:
+                tagged = await add_mteam_tag_to_torrents(downloader, hashes)
+                if tagged > 0:
+                    logger.info(f"[兼容] 下载器 {downloader.name}: 为 {tagged} 个历史种子补充了 M-Team-Helper 标签")
+                    total_tagged += tagged
+            except Exception as e:
+                logger.warning(f"[兼容] 下载器 {downloader.name} 补充标签失败: {e}")
+
+        if total_tagged > 0:
+            logger.info(f"[兼容] 共为 {total_tagged} 个种子补充了 M-Team-Helper 标签")
+
+    except Exception as e:
+        logger.error(f"[兼容] 补充历史种子标签失败: {e}")
     finally:
         db.close()
 

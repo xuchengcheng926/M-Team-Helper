@@ -13,7 +13,7 @@ from config import settings
 from database import init_db
 from routers import accounts, downloaders, torrents, rules, history
 from routers.auth import router as auth_router
-from services.scheduler import start_scheduler, stop_scheduler
+from services.scheduler import start_scheduler, stop_scheduler, tag_existing_history_torrents
 from utils.logger import LoggerManager, app_logger
 
 # 初始化日志系统
@@ -54,6 +54,9 @@ async def lifespan(app: FastAPI):
 
     # 2. 启动调度器
     start_scheduler()
+
+    # 3. 向前兼容：为旧版本数据库中已有但未打标签的种子补充 M-Team-Helper 标签
+    await tag_existing_history_torrents()
 
     yield  # 应用运行中
 
