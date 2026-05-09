@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+
+# Node
+frontend/node_modules
+frontend/dist
+
+# Python
+backend/__pycache__
+backend/**/__pycache__
+backend/**/*.pyc
+backend/venv
+backend/.venv
+backend/data
+
+# IDE / OS
+.idea
+.vscode
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+data/logs
+
+# Docker files (not needed inside the image)
+Dockerfile
+docker-compose.yaml
+.dockerignore
+
+# Docs / scripts not needed at runtime
+README.md
+deploy.sh

@@ -19,6 +19,9 @@ from services.downloader import (
     resume_torrent,
     delete_torrent,
     normalize_torrent_status,
+    get_mteam_tagged_torrents,
+    get_all_torrents_with_details,
+    M_TEAM_HELPER_TAG,
 )
 from config import TORRENT_DIR
 from utils.cache import cached, cache_key_with_params
@@ -348,14 +351,11 @@ async def upload_torrent_file(
         tag_list = []
         if tags:
             tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
-            
-            # 确保标签在下载器中存在
-            existing_tags = await get_tags(downloader)
-            new_tags = [tag for tag in tag_list if tag not in existing_tags]
-            if new_tags:
-                await create_tags(downloader, new_tags)
+        # 始终包含 M_TEAM_HELPER_TAG，确保手动上传的种子也受本软件管理
+        if M_TEAM_HELPER_TAG not in tag_list:
+            tag_list.append(M_TEAM_HELPER_TAG)
         
-        # 添加到下载器
+        # 添加到下载器（add_torrent 内部会自动处理标签创建）
         info_hash = await add_torrent(downloader, str(torrent_path), save_path, tag_list)
         
         if not info_hash:
@@ -441,8 +441,6 @@ async def sync_download_status(
     Args:
         import_first: 如果为 True，先从下载器导入新种子再同步状态
     """
-    from services.downloader import get_all_torrents_with_details
-    
     imported_count = 0
     
     # 如果需要先导入种子
@@ -458,8 +456,9 @@ async def sync_download_status(
         
         for downloader in downloaders:
             try:
-                torrents = await get_all_torrents_with_details(downloader)
-                print(f"[Import] 下载器 {downloader.name} 中有 {len(torrents)} 个种子")
+                # 只导入带有 M-Team-Helper 标签的种子，避免将其他软件的任务导入
+                torrents = await get_mteam_tagged_torrents(downloader)
+                print(f"[Import] 下载器 {downloader.name} 中有 {len(torrents)} 个 M-Team-Helper 种子")
                 
                 for torrent in torrents:
                     info_hash = torrent.get("hash", "").lower()
@@ -589,9 +588,8 @@ async def import_from_downloader(
     
     如果指定 downloader_id，只导入该下载器的种子；否则导入所有下载器的种子。
     只导入数据库中不存在的种子（根据 info_hash 判断）。
+    只导入带有 M-Team-Helper 标签的种子，避免将其他软件的任务导入管理。
     """
-    from services.downloader import get_all_torrents_with_details
-    
     # 获取要导入的下载器列表
     if downloader_id:
         downloaders = db.query(Downloader).filter(
@@ -620,9 +618,9 @@ async def import_from_downloader(
     
     for downloader in downloaders:
         try:
-            # 获取下载器中的所有种子
-            torrents = await get_all_torrents_with_details(downloader)
-            print(f"[Import] 下载器 {downloader.name} 中有 {len(torrents)} 个种子")
+            # 只导入带有 M-Team-Helper 标签的种子，避免将其他软件的任务导入管理
+            torrents = await get_mteam_tagged_torrents(downloader)
+            print(f"[Import] 下载器 {downloader.name} 中有 {len(torrents)} 个 M-Team-Helper 种子")
             
             for torrent in torrents:
                 info_hash = torrent.get("hash", "").lower()
