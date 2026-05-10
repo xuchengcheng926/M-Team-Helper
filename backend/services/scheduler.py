@@ -22,8 +22,8 @@ scheduler = AsyncIOScheduler()
 EXPIRE_DELETE_ADVANCE_SECONDS = 900  # 5分钟
 
 # 自动规则搜索分页配置
-AUTO_RULE_SEARCH_PAGE_SIZE = 50
-AUTO_RULE_MAX_PAGES = 5
+AUTO_RULE_SEARCH_PAGE_SIZE = 200
+AUTO_RULE_MAX_PAGES = 1
 
 # 记录任务上次执行时间
 last_execution_times = {}
@@ -639,7 +639,8 @@ async def auto_download_torrents():
                     if total_count > 0 and page * AUTO_RULE_SEARCH_PAGE_SIZE >= total_count:
                         break
                     
-                    sleep(15)  # 避免请求过快被封禁
+                    if page < AUTO_RULE_MAX_PAGES:
+                        sleep(10)  # 避免请求过快被封禁
 
                 if not torrents:
                     logger.info(f"规则 '{rule.name}' 未获取到可处理的种子")
