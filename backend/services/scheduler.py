@@ -1,4 +1,5 @@
 from datetime import datetime, timezone, timedelta
+from time import sleep
 from typing import List, Dict, Any
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -18,7 +19,7 @@ from utils.logger import scheduler_logger as logger
 scheduler = AsyncIOScheduler()
 
 # 到期前提前删除的时间（秒）
-EXPIRE_DELETE_ADVANCE_SECONDS = 300  # 5分钟
+EXPIRE_DELETE_ADVANCE_SECONDS = 900  # 5分钟
 
 # 自动规则搜索分页配置
 AUTO_RULE_SEARCH_PAGE_SIZE = 50
@@ -637,6 +638,8 @@ async def auto_download_torrents():
                     # 根据 total 提前终止
                     if total_count > 0 and page * AUTO_RULE_SEARCH_PAGE_SIZE >= total_count:
                         break
+                    
+                    sleep(15)  # 避免请求过快被封禁
 
                 if not torrents:
                     logger.info(f"规则 '{rule.name}' 未获取到可处理的种子")
@@ -679,7 +682,7 @@ async def auto_download_torrents():
                         continue
                     
                     # 检查是否匹配规则
-                    if not match_torrent(torrent, rule):
+                    if not match_torrent(torrent, rule, True):
                         skip_rule_mismatch += 1
                         continue
                     
