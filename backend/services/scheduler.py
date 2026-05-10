@@ -683,7 +683,7 @@ async def auto_download_torrents():
                         continue
                     
                     # 检查是否匹配规则
-                    if not match_torrent(torrent, rule, True):
+                    if not match_torrent(torrent, rule):
                         skip_rule_mismatch += 1
                         continue
                     
