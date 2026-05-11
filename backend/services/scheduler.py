@@ -19,7 +19,7 @@ from utils.logger import scheduler_logger as logger
 scheduler = AsyncIOScheduler()
 
 # 到期前提前删除的时间（秒）
-EXPIRE_DELETE_ADVANCE_SECONDS = 900  # 5分钟
+EXPIRE_DELETE_ADVANCE_SECONDS = 900  # 15分钟
 
 # 自动规则搜索分页配置
 AUTO_RULE_SEARCH_PAGE_SIZE = 200

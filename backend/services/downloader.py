@@ -218,6 +218,8 @@ async def add_torrent(
             info_hash = _extract_torrent_info_hash(torrent_content) or "unknown"
             if info_hash != "unknown":
                 _apply_qb_torrent_limits(client, info_hash, download_limit_kbps, upload_limit_kbps)
+                # 如果 QB 关闭了添加种子后自动下载，需要主动激活种子进行下载
+                client.torrents_start(torrent_hashes=info_hash)
             return info_hash
         
         elif downloader.type == "transmission":
