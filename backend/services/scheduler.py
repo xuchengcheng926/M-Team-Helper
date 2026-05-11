@@ -613,7 +613,8 @@ async def auto_download_torrents():
                         page_size=AUTO_RULE_SEARCH_PAGE_SIZE,
                         mode=rule.mode,  # 使用规则的模式（normal 或 adult）
                         categories=normalized_categories,
-                        discount=discount
+                        discount=discount,
+                        guanzu=bool(rule.guanzu)
                     )
 
                     if not result["success"]:

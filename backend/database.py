@@ -74,6 +74,7 @@ def run_migrations():
         ("filter_rules", "max_leechers", "INTEGER"),
         ("filter_rules", "download_limit_kbps", "INTEGER"),
         ("filter_rules", "upload_limit_kbps", "INTEGER"),
+        ("filter_rules", "guanzu", "BOOLEAN DEFAULT 0"),
     ]
     
     with engine.connect() as conn:

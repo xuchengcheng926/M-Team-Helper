@@ -19,6 +19,7 @@ class RuleCreate(BaseModel):
     rule_type: str = "normal"  # normal=普通规则, favorite=收藏监控规则
     free_only: bool = False
     double_upload: bool = False
+    guanzu: bool = False
     min_size: Optional[float] = None  # GB
     max_size: Optional[float] = None  # GB
     min_seeders: Optional[int] = None
@@ -48,6 +49,7 @@ class RuleResponse(BaseModel):
     rule_type: str
     free_only: bool
     double_upload: bool
+    guanzu: bool
     min_size: Optional[float]
     max_size: Optional[float]
     min_seeders: Optional[int]
@@ -114,6 +116,7 @@ async def create_rule(rule: RuleCreate, db: Session = Depends(get_db)):
         rule_type=rule.rule_type,
         free_only=rule.free_only,
         double_upload=rule.double_upload,
+        guanzu=rule.guanzu,
         min_size=rule.min_size,
         max_size=rule.max_size,
         min_seeders=rule.min_seeders,

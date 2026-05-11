@@ -57,6 +57,7 @@ class FilterRule(Base):
     # 筛选条件
     free_only = Column(Boolean, default=False)  # 仅免费
     double_upload = Column(Boolean, default=False)  # 2x上传
+    guanzu = Column(Boolean, default=False)  # 仅官组
     min_size = Column(Float, nullable=True)  # 最小大小 (GB)
     max_size = Column(Float, nullable=True)  # 最大大小 (GB)
     min_seeders = Column(Integer, nullable=True)  # 最小做种数

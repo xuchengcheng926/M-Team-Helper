@@ -35,6 +35,7 @@ interface Rule {
   rule_type: string;  // normal 或 favorite
   free_only: boolean;
   double_upload: boolean;
+  guanzu: boolean;
   min_size: number | null;
   max_size: number | null;
   min_seeders: number | null;
@@ -337,6 +338,7 @@ export default function RulePage() {
       rule_type: merged.rule_type,
       free_only: merged.free_only,
       double_upload: merged.double_upload ?? false,
+      guanzu: merged.guanzu ?? false,
       min_size: merged.min_size,
       max_size: merged.max_size,
       min_seeders: merged.min_seeders,
@@ -439,6 +441,7 @@ export default function RulePage() {
           {r.rule_type === 'favorite' && <Tag color="gold" variant="filled">收藏监控</Tag>}
           <Tag color={r.mode === 'adult' ? 'magenta' : 'blue'} variant="filled">{r.mode === 'adult' ? '成人' : '普通'}</Tag>
           {r.free_only && <Tag color="green" variant="filled">免费</Tag>}
+          {r.guanzu && <Tag color="geekblue" variant="filled">官组</Tag>}
           {r.min_size && <Tag variant="filled">≥{r.min_size}GB</Tag>}
           {r.max_size && <Tag variant="filled">≤{r.max_size}GB</Tag>}
           {r.min_seeders && <Tag color="purple" variant="filled">做种≥{r.min_seeders}</Tag>}
@@ -651,7 +654,7 @@ export default function RulePage() {
               </Col>
             </Row>
           )}
-          
+
           <Row gutter={16}>
              <Col span={6}>
                 <Form.Item name="min_size" label="最小(GB)">
@@ -708,6 +711,22 @@ export default function RulePage() {
                 </Form.Item>
              </Col>
           </Row>
+
+          {selectedRuleType === 'normal' && (
+            <Row gutter={16}>
+              <Col span={6}>
+                <Form.Item
+                  name="guanzu"
+                  label="官组"
+                  valuePropName="checked"
+                  initialValue={false}
+                  tooltip="开启后仅搜索 M-Team 官组种子（teams: 44/9/43）。"
+                >
+                  <Switch />
+                </Form.Item>
+              </Col>
+            </Row>
+          )}
           
           {/* 分类选择 */}
           <Form.Item label="分类筛选" style={{ marginBottom: 0 }}>

@@ -92,7 +92,8 @@ class MTeamAPI:
         keyword: str = None,
         discount: str = None,  # FREE, PERCENT_50, _2X_FREE, _2X_PERCENT_50, _2X
         sort_field: str = "CREATED_DATE",
-        sort_direction: str = "DESC"
+        sort_direction: str = "DESC",
+        guanzu: bool = False
     ) -> Dict[str, Any]:
         """搜索种子列表"""
         data = {
@@ -111,6 +112,9 @@ class MTeamAPI:
         
         if discount:
             data["discount"] = discount
+            
+        if guanzu:
+            data["teams"] = ["44", "9", "43"]
         
         return await self._request("torrent/search", data)
     
